@@ -2,28 +2,42 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	r := gin.Default() // Logger + Recovery middleware
+	// ✅ Release mode for Gin (no debug logs)
+	gin.SetMode(gin.ReleaseMode)
 
-	// Middleware example: simple custom logging
-	// r.Use(func(c *gin.Context) {
-	//     fmt.Println("Request Path:", c.Request.URL.Path)
-	//     c.Next()
-	// })
+	// Create router without default Logger middleware (optional for max speed)
+	r := gin.New()
+	r.Use(gin.Recovery()) // keep only Recovery middleware
 
 	// Routes
 	r.GET("/hello", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "Hello, Go API!"})
+		c.JSON(http.StatusOK, gin.H{"message": "Hello, Go API!"})
 	})
 	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "pong"})
+		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
+	// HTTP server with Keep-Alive and timeouts
+	srv := &http.Server{
+		Addr:           "0.0.0.0:8080", // accessible from any IP
+		Handler:        r,
+		ReadTimeout:    5 * time.Second,
+		WriteTimeout:   5 * time.Second,
+		IdleTimeout:    120 * time.Second, // Keep-Alive connections
+		MaxHeaderBytes: 1 << 20,
+	}
+
+	fmt.Println("🚀 Server running at http://0.0.0.0:8080")
+
 	// Start server
-	fmt.Println("🚀 Server running at http://localhost:8080")
-	r.Run(":8080")
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("Server error: %v\n", err)
+	}
 }
